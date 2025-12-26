@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Flipbook AI</title>
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "@google/genai": "https://esm.sh/@google/genai@0.14.0",
+    "@ffmpeg/ffmpeg": "https://esm.sh/@ffmpeg/ffmpeg@0.12.10",
+    "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@0.12.1",
+    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+    "react/": "https://esm.sh/react@18.3.1/",
+    "dom": "https://esm.sh/dom@^0.0.3"
+  }
+}
+</script>
+<style>
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  /* Custom Range Slider Styles */
+  .range-slider-container {
+    position: relative;
+    width: 100%;
+    height: 2rem; /* 32px */
+    display: flex;
+    align-items: center;
+  }
+  .range-slider-container[data-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .range-slider-track, .range-slider-range {
+    position: absolute;
+    height: 0.5rem; /* 8px */
+    border-radius: 0.25rem; /* 4px */
+    width: 100%;
+    left: 0;
+  }
+  .range-slider-track {
+    background-color: #475569; /* slate-600 */
+  }
+  .range-slider-range {
+    background-color: #06b6d4; /* cyan-500 */
+  }
+  .range-slider-thumb {
+    position: absolute;
+    width: 1.25rem; /* 20px */
+    height: 1.25rem; /* 20px */
+    background-color: white;
+    border-radius: 9999px;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    border: 3px solid #06b6d4; /* cyan-500 */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    z-index: 10;
+  }
+  .range-slider-container[data-disabled='true'] .range-slider-thumb {
+    cursor: not-allowed;
+  }
+  
+  /* Dropdown Styles */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    bottom: 100%; /* Position above the button */
+    left: 0;
+    right: 0;
+    background-color: #1e293b; /* slate-800 */
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 0.5rem;
+    border: 1px solid #334155; /* slate-700 */
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  }
+  .dropdown-content[data-open='true'] {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .dropdown-content button {
+    color: #cbd5e1; /* slate-300 */
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .dropdown-content button:hover {
+    background-color: #334155; /* slate-700 */
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

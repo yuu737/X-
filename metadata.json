@@ -1,0 +1,6 @@
+{
+  "name": "Copy of 写真",
+  "description": "An application that converts video files into animated flipbooks, generates a creative title using AI, and allows users to download the result as a GIF.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
