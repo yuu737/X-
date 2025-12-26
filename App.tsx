@@ -5,7 +5,6 @@ import { FlipbookViewer } from './FlipbookViewer';
 import { AsciiPlayer } from './AsciiPlayer';
 import { Loader } from './Loader';
 import { DownloadIcon, FilmIcon, SparklesIcon, XCircleIcon, MonochromeIcon, PencilIcon, PhotoIcon, CelShadingIcon, PopArtIcon, AnimationSketchIcon, ColorfulIcon, ChevronDownIcon, UkiyoEIcon, EightBitIcon, AsciiArtIcon, ClipboardIcon, CheckIcon, RedoIcon, SilhouetteIcon, OutlineIcon, TransparentBgIcon, InvertIcon, ZoomInIcon, ZoomOutIcon, FitScreenIcon, EnterFullscreenIcon, ExitFullscreenIcon } from './Icons';
-import { generateTitleForImage } from './services/geminiService';
 import { applyPencilSketchEffect, applyCelShadingEffect, applyPopArtEffect, applyGengaEffect, applyUkiyoE_Effect, apply8BitEffect, convertImageToAscii, applySilhouetteEffect, applyColoredAsciiEffect, type GengaConfig } from './services/imageEffects';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
@@ -143,7 +142,6 @@ export default function App(): React.ReactNode {
   const [effect, setEffect] = useState<Effect>('none');
   const [selectedResolutionKey, setSelectedResolutionKey] = useState<string>('auto');
   const [resolutionOptions, setResolutionOptions] = useState<ResolutionOption[]>([]);
-  const [aiTitle, setAiTitle] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [timeRange, setTimeRange] = useState<[number, number]>([0, 0]);
   const [gengaConfig, setGengaConfig] = useState<GengaConfig>({ outline: '#000000', shadow: '#3b82f6', highlight: '#f43f5e' });
@@ -248,7 +246,7 @@ export default function App(): React.ReactNode {
     setImagePreviewUrl(null);
     setImageAsciiOutput('');
     setImageAsciiDataUrl(null);
-    setProgress(0); setAiTitle(null); setDuration(0); setTimeRange([0, 0]);
+    setProgress(0); setDuration(0); setTimeRange([0, 0]);
     setResolutionOptions([]); setSelectedResolutionKey('auto');
     setDownloadInfo(null);
     setStatus('idle'); setError(null); setViewMode('idle');
@@ -347,10 +345,6 @@ export default function App(): React.ReactNode {
             });
         }
         setAsciiFrames(newAsciiFrames);
-        if (newAsciiFrames.length > 0) {
-            try { setAiTitle(await generateTitleForImage(newAsciiFrames[0], effect)); }
-            catch (err) { console.error("AI title generation failed:", err); setAiTitle("クリエイティブなアスキーアートアニメーション"); }
-        }
     } else {
         const newProcessedFrames: string[] = [];
         for(let i = 0; i < totalFrames; i++) {
@@ -385,16 +379,6 @@ export default function App(): React.ReactNode {
             });
         }
         setProcessedFrames(newProcessedFrames);
-        if (newProcessedFrames.length > 0) {
-            if (effect === 'silhouette') setAiTitle("シルエットアニメーション");
-            else if (effect === 'ascii') setAiTitle("カラーアスキーアートアニメーション");
-            else {
-                try {
-                    const base64Data = newProcessedFrames[0].split(',')[1];
-                    setAiTitle(await generateTitleForImage(base64Data, effect));
-                } catch (err) { console.error("AI title generation failed:", err); setAiTitle("クリエイティブなパラパラ漫画"); }
-            }
-        }
     }
     ctx.filter = 'none'; setStatus('success');
   }, [effect, gengaConfig, improveGengaQuality, gengaLineThreshold, eightBitPixelSize, videoAsciiWidth, silhouetteThreshold, videoAsciiOutlineMode, videoAsciiLineThreshold, videoAsciiTransparentBg, videoAsciiBgThreshold, videoAsciiInvertColors, videoAsciiColorMode]);
@@ -402,7 +386,7 @@ export default function App(): React.ReactNode {
   const extractFrames = useCallback(async () => {
     if (!videoFile || !videoRef.current || !canvasRef.current) return;
     setDownloadInfo(null); setStatus('processing'); setLoadingText('フレームを抽出中...');
-    setAiTitle(null); setProgress(0); setError(null);
+    setProgress(0); setError(null);
     setOriginalFrames([]); setProcessedFrames([]); setAsciiFrames([]);
     const video = videoRef.current; const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -472,7 +456,10 @@ export default function App(): React.ReactNode {
         const data = await ffmpeg.readFile(outputFilename);
         const blob = new Blob([data as Uint8Array], { type: format === 'gif' ? 'image/gif' : 'video/mp4' });
         const url = URL.createObjectURL(blob);
-        const safeFilename = (aiTitle || 'flipbook').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').substring(0, 100);
+        
+        const baseName = videoFile ? videoFile.name.split('.')[0] : 'video';
+        const safeFilename = `${baseName}_${effect}`.replace(/[\\/:*?"<>|]/g, '_').substring(0, 100);
+        
         setDownloadInfo({ url, filename: `${safeFilename}.${format}`, type: format.toUpperCase() as 'GIF' | 'MP4' });
         await ffmpeg.deleteFile(outputFilename);
         if (format === 'gif') await ffmpeg.deleteFile('palette.png');
@@ -603,7 +590,10 @@ export default function App(): React.ReactNode {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = (aiTitle || 'ascii_art').replace(/\s+/g, '_') + '.txt';
+    
+    const baseName = imageFile ? imageFile.name.split('.')[0] : 'image';
+    link.download = `${baseName}_ascii.txt`;
+    
     link.click();
     URL.revokeObjectURL(url);
   };
