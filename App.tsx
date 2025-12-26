@@ -267,7 +267,7 @@ export default function App(): React.ReactNode {
         setImagePreviewUrl(URL.createObjectURL(file));
         setViewMode('ascii');
     } else {
-        setError("Please select a valid video or image file.");
+        setError("有効な動画ファイルまたは画像ファイルを選択してください。");
     }
   };
   
@@ -315,12 +315,12 @@ export default function App(): React.ReactNode {
 
   const applyEffectOnFrames = useCallback(async (sourceFrames: string[]) => {
     if (sourceFrames.length === 0 || !canvasRef.current) return;
-    setStatus('processing'); setLoadingText('Applying effect...'); setError(null);
+    setStatus('processing'); setLoadingText('エフェクトを適用中...'); setError(null);
     setProgress(0); setProcessedFrames([]); setAsciiFrames([]);
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) { setError("Could not get canvas context."); setStatus('error'); return; }
+    if (!ctx) { setError("キャンバスのコンテキストを取得できませんでした。"); setStatus('error'); return; }
     
     const totalFrames = sourceFrames.length;
     
@@ -349,7 +349,7 @@ export default function App(): React.ReactNode {
         setAsciiFrames(newAsciiFrames);
         if (newAsciiFrames.length > 0) {
             try { setAiTitle(await generateTitleForImage(newAsciiFrames[0], effect)); }
-            catch (err) { console.error("AI title generation failed:", err); setAiTitle("A Creative ASCII Animation"); }
+            catch (err) { console.error("AI title generation failed:", err); setAiTitle("クリエイティブなアスキーアートアニメーション"); }
         }
     } else {
         const newProcessedFrames: string[] = [];
@@ -363,7 +363,11 @@ export default function App(): React.ReactNode {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
                     if (effect === 'ascii' && videoAsciiColorMode) {
-                        applyColoredAsciiEffect(ctx, canvas.width, canvas.height, videoAsciiWidth, videoAsciiInvertColors);
+                        applyColoredAsciiEffect(
+                            ctx, canvas.width, canvas.height, videoAsciiWidth, videoAsciiInvertColors,
+                            videoAsciiOutlineMode ? { threshold: videoAsciiLineThreshold } : undefined,
+                            videoAsciiTransparentBg ? { threshold: videoAsciiBgThreshold } : undefined
+                        );
                     }
                     else if (effect === 'pencil') applyPencilSketchEffect(ctx, canvas.width, canvas.height);
                     else if (effect === 'cel') applyCelShadingEffect(ctx, canvas.width, canvas.height);
@@ -382,13 +386,13 @@ export default function App(): React.ReactNode {
         }
         setProcessedFrames(newProcessedFrames);
         if (newProcessedFrames.length > 0) {
-            if (effect === 'silhouette') setAiTitle("A Silhouette Animation");
-            else if (effect === 'ascii') setAiTitle("A Colored ASCII Animation");
+            if (effect === 'silhouette') setAiTitle("シルエットアニメーション");
+            else if (effect === 'ascii') setAiTitle("カラーアスキーアートアニメーション");
             else {
                 try {
                     const base64Data = newProcessedFrames[0].split(',')[1];
                     setAiTitle(await generateTitleForImage(base64Data, effect));
-                } catch (err) { console.error("AI title generation failed:", err); setAiTitle("A Creative Flipbook"); }
+                } catch (err) { console.error("AI title generation failed:", err); setAiTitle("クリエイティブなパラパラ漫画"); }
             }
         }
     }
@@ -397,12 +401,12 @@ export default function App(): React.ReactNode {
 
   const extractFrames = useCallback(async () => {
     if (!videoFile || !videoRef.current || !canvasRef.current) return;
-    setDownloadInfo(null); setStatus('processing'); setLoadingText('Extracting frames...');
+    setDownloadInfo(null); setStatus('processing'); setLoadingText('フレームを抽出中...');
     setAiTitle(null); setProgress(0); setError(null);
     setOriginalFrames([]); setProcessedFrames([]); setAsciiFrames([]);
     const video = videoRef.current; const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) { setError("Could not get canvas context."); setStatus('error'); return; }
+    if (!ctx) { setError("キャンバスのコンテキストを取得できませんでした。"); setStatus('error'); return; }
     video.src = URL.createObjectURL(videoFile);
     video.onloadedmetadata = async () => {
         const { videoWidth: originalWidth, videoHeight: originalHeight } = video;
@@ -414,7 +418,7 @@ export default function App(): React.ReactNode {
         canvas.width = Math.floor(targetWidth / 2) * 2; canvas.height = Math.floor(targetHeight / 2) * 2;
         const [startTime, endTime] = timeRange;
         const clipDuration = endTime - startTime;
-        if (clipDuration <= 0) { setError("The selected time range is not valid."); setStatus('error'); return; }
+        if (clipDuration <= 0) { setError("選択された時間範囲が無効です。"); setStatus('error'); return; }
         const interval = 1 / fps; const extractedRawFrames: string[] = [];
         for (let currentTime = startTime; currentTime <= endTime; currentTime += interval) {
             video.currentTime = currentTime;
@@ -425,7 +429,7 @@ export default function App(): React.ReactNode {
         }
         setOriginalFrames(extractedRawFrames); await applyEffectOnFrames(extractedRawFrames);
     };
-    video.onerror = () => { setError("Failed to load video data."); setStatus('error'); };
+    video.onerror = () => { setError("動画データの読み込みに失敗しました。"); setStatus('error'); };
   }, [videoFile, fps, timeRange, selectedResolutionKey, resolutionOptions, applyEffectOnFrames]);
 
   const handleGenerateClick = () => {
@@ -436,7 +440,7 @@ export default function App(): React.ReactNode {
   const loadFfmpeg = async () => {
     if (ffmpegRef.current?.loaded) return ffmpegRef.current;
     const ffmpeg = new FFmpeg();
-    setLoadingText('Initializing encoder...');
+    setLoadingText('エンコーダーを初期化中...');
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
     await ffmpeg.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -454,7 +458,7 @@ export default function App(): React.ReactNode {
     try {
         const ffmpeg = await loadFfmpeg();
         ffmpeg.off('progress', ffmpegProgressListener); ffmpeg.on('progress', ffmpegProgressListener);
-        setLoadingText(`Preparing frames for ${format.toUpperCase()}...`);
+        setLoadingText(`${format.toUpperCase()}作成の準備中...`);
         for (let i = 0; i < processedFrames.length; i++) {
             await ffmpeg.writeFile(`frame-${String(i).padStart(5, '0')}.jpg`, dataUrlToUint8Array(processedFrames[i]));
         }
@@ -475,7 +479,7 @@ export default function App(): React.ReactNode {
         for (let i = 0; i < processedFrames.length; i++) await ffmpeg.deleteFile(`frame-${String(i).padStart(5, '0')}.jpg`);
         setStatus('success');
     } catch (err) {
-        setError(`Failed to create ${format.toUpperCase()} file. Check console.`); setStatus('error');
+        setError(`${format.toUpperCase()}ファイルの作成に失敗しました。コンソールを確認してください。`); setStatus('error');
     } finally {
         if (ffmpegRef.current) ffmpegRef.current.off('progress', ffmpegProgressListener);
         setProgress(0); setLoadingText('');
@@ -490,7 +494,7 @@ export default function App(): React.ReactNode {
 
   useEffect(() => {
     if (!imageFile || !canvasRef.current) return;
-    setStatus('processing'); setLoadingText('Generating ASCII Art...');
+    setStatus('processing'); setLoadingText('アスキーアートを生成中...');
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const img = new Image();
@@ -506,7 +510,11 @@ export default function App(): React.ReactNode {
             );
             setImageAsciiOutput(asciiText);
             if (imageAsciiColorMode) {
-                applyColoredAsciiEffect(ctx, canvas.width, canvas.height, imageAsciiWidth, imageAsciiInvertColors);
+                applyColoredAsciiEffect(
+                    ctx, canvas.width, canvas.height, imageAsciiWidth, imageAsciiInvertColors,
+                    imageAsciiOutlineMode ? { threshold: imageAsciiLineThreshold } : undefined,
+                    imageAsciiTransparentBg ? { threshold: imageAsciiBgThreshold } : undefined
+                );
                 setImageAsciiDataUrl(canvas.toDataURL('image/jpeg', 0.9));
             } else {
                 setImageAsciiDataUrl(null);
@@ -612,44 +620,52 @@ export default function App(): React.ReactNode {
         <div className="bg-slate-700/50 p-4 rounded-lg space-y-4">
           {duration > 0 && (
               <div className="pt-2">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Trim Video</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">動画のトリミング</label>
                 <RangeSlider min={0} max={duration} value={timeRange} onChange={handleTimeRangeChange} disabled={isProcessing} />
                 <div className="flex justify-between text-xs text-slate-400 mt-2">
-                    <span>Start: <span className="font-mono text-cyan-400">{formatTime(timeRange[0])}</span></span>
-                    <span>End: <span className="font-mono text-cyan-400">{formatTime(timeRange[1])}</span></span>
+                    <span>開始: <span className="font-mono text-cyan-400">{formatTime(timeRange[0])}</span></span>
+                    <span>終了: <span className="font-mono text-cyan-400">{formatTime(timeRange[1])}</span></span>
                 </div>
               </div>
           )}
           <div>
-            <label htmlFor="fps" className="block text-sm font-medium text-slate-300 mb-2">FPS: <span className="font-bold text-cyan-400">{fps}</span></label>
+            <label htmlFor="fps" className="block text-sm font-medium text-slate-300 mb-2">フレームレート (FPS): <span className="font-bold text-cyan-400">{fps}</span></label>
             <input type="range" id="fps" min="1" max="30" value={fps} onChange={(e) => setFps(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-cyan-500" disabled={isProcessing} />
           </div>
           <div className="pt-4 border-t border-slate-600/50">
-            <label className="block text-sm font-medium text-slate-300 mb-3">Artistic Effect</label>
+            <label className="block text-sm font-medium text-slate-300 mb-3">エフェクト選択</label>
             <div className="grid grid-cols-3 gap-2">
-                <EffectButton label="Default" icon={<PhotoIcon className="w-5 h-5" />} isActive={effect === 'none'} onClick={() => setEffect('none')} disabled={isProcessing} />
-                <EffectButton label="Pencil" icon={<PencilIcon className="w-5 h-5" />} isActive={effect === 'pencil'} onClick={() => setEffect('pencil')} disabled={isProcessing} />
-                <EffectButton label="ASCII" icon={<AsciiArtIcon className="w-5 h-5" />} isActive={effect === 'ascii'} onClick={() => setEffect('ascii')} disabled={isProcessing} />
-                <EffectButton label="Cel" icon={<CelShadingIcon className="w-5 h-5" />} isActive={effect === 'cel'} onClick={() => setEffect('cel')} disabled={isProcessing} />
-                <EffectButton label="Pop Art" icon={<PopArtIcon className="w-5 h-5" />} isActive={effect === 'popart'} onClick={() => setEffect('popart')} disabled={isProcessing} />
-                <EffectButton label="8-bit" icon={<EightBitIcon className="w-5 h-5" />} isActive={effect === '8bit'} onClick={() => setEffect('8bit')} disabled={isProcessing} />
+                <EffectButton label="標準" icon={<PhotoIcon className="w-5 h-5" />} isActive={effect === 'none'} onClick={() => setEffect('none')} disabled={isProcessing} />
+                <EffectButton label="鉛筆画" icon={<PencilIcon className="w-5 h-5" />} isActive={effect === 'pencil'} onClick={() => setEffect('pencil')} disabled={isProcessing} />
+                <EffectButton label="アスキー" icon={<AsciiArtIcon className="w-5 h-5" />} isActive={effect === 'ascii'} onClick={() => setEffect('ascii')} disabled={isProcessing} />
+                <EffectButton label="セル画" icon={<CelShadingIcon className="w-5 h-5" />} isActive={effect === 'cel'} onClick={() => setEffect('cel')} disabled={isProcessing} />
+                <EffectButton label="ポップアート" icon={<PopArtIcon className="w-5 h-5" />} isActive={effect === 'popart'} onClick={() => setEffect('popart')} disabled={isProcessing} />
+                <EffectButton label="8ビット" icon={<EightBitIcon className="w-5 h-5" />} isActive={effect === '8bit'} onClick={() => setEffect('8bit')} disabled={isProcessing} />
             </div>
             {effect === 'ascii' && (
               <div className="mt-4 pt-4 border-t border-slate-600/50 space-y-4">
-                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">Color Mode (Detailed)</label><button onClick={() => setVideoAsciiColorMode(!videoAsciiColorMode)} className={`${videoAsciiColorMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${videoAsciiColorMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">カラーモード (高精細)</label><button onClick={() => setVideoAsciiColorMode(!videoAsciiColorMode)} className={`${videoAsciiColorMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${videoAsciiColorMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
                 <input type="range" min="40" max="800" step="10" value={videoAsciiWidth} onChange={(e) => setVideoAsciiWidth(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" />
+                
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">輪郭強調モード</label><button onClick={() => setVideoAsciiOutlineMode(!videoAsciiOutlineMode)} className={`${videoAsciiOutlineMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${videoAsciiOutlineMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                {videoAsciiOutlineMode && <input type="range" min="10" max="150" value={videoAsciiLineThreshold} onChange={(e) => setVideoAsciiLineThreshold(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" />}
+
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">背景透過</label><button onClick={() => setVideoAsciiTransparentBg(!videoAsciiTransparentBg)} className={`${videoAsciiTransparentBg ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${videoAsciiTransparentBg ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                {videoAsciiTransparentBg && <input type="range" min="1" max="100" value={videoAsciiBgThreshold} onChange={(e) => setVideoAsciiBgThreshold(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" />}
+                
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">文字反転</label><button onClick={() => setVideoAsciiInvertColors(!videoAsciiInvertColors)} className={`${videoAsciiInvertColors ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${videoAsciiInvertColors ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
               </div>
             )}
           </div>
         </div>
         <button onClick={handleGenerateClick} disabled={isProcessing} className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-cyan-500 to-teal-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:from-cyan-600 hover:to-teal-700 transition-all duration-300">
           <SparklesIcon className="w-5 h-5" />
-          <span>Generate Flipbook</span>
+          <span>パラパラ漫画を生成</span>
         </button>
       </div>
       <div ref={flipbookViewerRef} className="flex flex-col items-center justify-center bg-slate-700/50 rounded-lg p-4 min-h-[30rem] relative">
         {(asciiFrames.length > 0 || processedFrames.length > 0) && !isProcessing && (
-          <button onClick={() => toggleFullscreen(flipbookViewerRef)} className="absolute top-3 right-3 z-20 p-2 text-slate-300 hover:text-white bg-slate-800/80 rounded-full">{isFullscreen ? <ExitFullscreenIcon className="w-5 h-5" /> : <EnterFullscreenIcon className="w-5 h-5" />}</button>
+          <button onClick={() => toggleFullscreen(flipbookViewerRef)} title={isFullscreen ? '全画面表示を終了' : '全画面表示'} className="absolute top-3 right-3 z-20 p-2 text-slate-300 hover:text-white bg-slate-800/80 rounded-full">{isFullscreen ? <ExitFullscreenIcon className="w-5 h-5" /> : <EnterFullscreenIcon className="w-5 h-5" />}</button>
         )}
         {isProcessing ? (<Loader progress={progress} statusText={loadingText} />) : 
           (asciiFrames.length > 0 || processedFrames.length > 0) ? (
@@ -657,11 +673,11 @@ export default function App(): React.ReactNode {
             <div className="flex-grow min-h-0">{processedFrames.length > 0 ? (<FlipbookViewer frames={processedFrames} fps={fps} />) : (<AsciiPlayer frames={asciiFrames} fps={fps} />)}</div>
             <div className="flex items-center justify-center gap-4 pt-2">
               <div ref={downloadMenuRef} className="dropdown">
-                  <button onClick={() => setDownloadMenuOpen(!isDownloadMenuOpen)} className="flex items-center gap-2 bg-slate-600 text-white font-bold py-2 px-4 rounded-lg"><DownloadIcon className="w-5 h-5" /><span>Download</span><ChevronDownIcon className={`w-4 h-4 transition-transform ${isDownloadMenuOpen ? 'rotate-180' : ''}`} /></button>
-                  <div className="dropdown-content" data-open={isDownloadMenuOpen}><button onClick={() => createDownload('gif')}>As GIF</button><button onClick={() => createDownload('mp4')}>As MP4</button></div>
+                  <button onClick={() => setDownloadMenuOpen(!isDownloadMenuOpen)} className="flex items-center gap-2 bg-slate-600 text-white font-bold py-2 px-4 rounded-lg"><DownloadIcon className="w-5 h-5" /><span>ダウンロード</span><ChevronDownIcon className={`w-4 h-4 transition-transform ${isDownloadMenuOpen ? 'rotate-180' : ''}`} /></button>
+                  <div className="dropdown-content" data-open={isDownloadMenuOpen}><button onClick={() => createDownload('gif')}>GIF形式</button><button onClick={() => createDownload('mp4')}>MP4形式</button></div>
               </div>
             </div>
-          </div>) : (<div className="text-center text-slate-500"><FilmIcon className="w-16 h-16 mx-auto mb-4" /><p>Result will appear here</p></div>)}
+          </div>) : (<div className="text-center text-slate-500"><FilmIcon className="w-16 h-16 mx-auto mb-4" /><p>ここに結果が表示されます</p></div>)}
       </div>
     </div>
   );
@@ -671,18 +687,25 @@ export default function App(): React.ReactNode {
         <div className="flex flex-col space-y-6">
             <div className="relative group"><img src={imagePreviewUrl!} alt="Preview" className="w-full rounded-lg shadow-lg max-h-[60vh] object-contain" /><button onClick={resetState} className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-6 h-6" /></button></div>
             <div className="bg-slate-700/50 p-4 rounded-lg space-y-4">
-                <h3 className="text-lg font-semibold text-slate-200">ASCII Art Settings</h3>
-                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">Color Mode (Detailed)</label><button onClick={() => setImageAsciiColorMode(!imageAsciiColorMode)} className={`${imageAsciiColorMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiColorMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
-                <div><label className="block text-sm font-medium text-slate-300 mb-2">Width: <span className="font-bold text-cyan-400">{imageAsciiWidth}</span></label><input type="range" min="40" max="800" step="10" value={imageAsciiWidth} onChange={(e) => setImageAsciiWidth(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" disabled={isProcessing} /></div>
-                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">Invert Characters</label><button onClick={() => setImageAsciiInvertColors(!imageAsciiInvertColors)} className={`${imageAsciiInvertColors ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiInvertColors ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                <h3 className="text-lg font-semibold text-slate-200">アスキーアート設定</h3>
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">カラーモード (高精細)</label><button onClick={() => setImageAsciiColorMode(!imageAsciiColorMode)} className={`${imageAsciiColorMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiColorMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                <div><label className="block text-sm font-medium text-slate-300 mb-2">幅 (文字数): <span className="font-bold text-cyan-400">{imageAsciiWidth}</span></label><input type="range" min="40" max="800" step="10" value={imageAsciiWidth} onChange={(e) => setImageAsciiWidth(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" disabled={isProcessing} /></div>
+                
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">輪郭強調モード</label><button onClick={() => setImageAsciiOutlineMode(!imageAsciiOutlineMode)} className={`${imageAsciiOutlineMode ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiOutlineMode ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                {imageAsciiOutlineMode && <input type="range" min="10" max="150" value={imageAsciiLineThreshold} onChange={(e) => setImageAsciiLineThreshold(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" disabled={isProcessing} />}
+
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">背景透過</label><button onClick={() => setImageAsciiTransparentBg(!imageAsciiTransparentBg)} className={`${imageAsciiTransparentBg ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiTransparentBg ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
+                {imageAsciiTransparentBg && <input type="range" min="1" max="100" value={imageAsciiBgThreshold} onChange={(e) => setImageAsciiBgThreshold(parseInt(e.currentTarget.value, 10))} className="w-full h-2 bg-slate-600 rounded-lg accent-cyan-500" disabled={isProcessing} />}
+
+                <div className="flex items-center justify-between"><label className="text-sm font-medium text-slate-300">文字反転</label><button onClick={() => setImageAsciiInvertColors(!imageAsciiInvertColors)} className={`${imageAsciiInvertColors ? 'bg-cyan-500' : 'bg-slate-600'} relative inline-flex h-6 w-11 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200`}><span className={`${imageAsciiInvertColors ? 'translate-x-5' : 'translate-x-0'} inline-block h-5 w-5 transform rounded-full bg-white transition duration-200`} /></button></div>
             </div>
              <button onClick={resetState} className="w-full flex items-center justify-center gap-3 bg-slate-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg">
-                <RedoIcon className="w-5 h-5" /><span>Start Over</span>
+                <RedoIcon className="w-5 h-5" /><span>最初に戻る</span>
             </button>
         </div>
         <div ref={asciiViewerRef} className="flex flex-col items-center justify-center bg-slate-900/70 rounded-lg p-1 min-h-[30rem] relative">
             {(imageAsciiOutput || imageAsciiDataUrl) && !isProcessing && (
-                <button onClick={() => toggleFullscreen(asciiViewerRef)} className="absolute top-3 right-3 z-20 p-2 text-slate-300 hover:text-white bg-slate-800/80 rounded-full">{isFullscreen ? <ExitFullscreenIcon className="w-5 h-5" /> : <EnterFullscreenIcon className="w-5 h-5" />}</button>
+                <button onClick={() => toggleFullscreen(asciiViewerRef)} title={isFullscreen ? '全画面表示を終了' : '全画面表示'} className="absolute top-3 right-3 z-20 p-2 text-slate-300 hover:text-white bg-slate-800/80 rounded-full">{isFullscreen ? <ExitFullscreenIcon className="w-5 h-5" /> : <EnterFullscreenIcon className="w-5 h-5" />}</button>
             )}
             {isProcessing ? (<Loader statusText={loadingText} />) : 
             (imageAsciiOutput || imageAsciiDataUrl) ? (
@@ -693,38 +716,38 @@ export default function App(): React.ReactNode {
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap justify-center items-center gap-1 bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg p-1 border border-slate-700 max-w-[90vw]">
                         {!imageAsciiDataUrl && (
                           <>
-                            <button onClick={handleImageZoomOut} className="p-2 text-slate-300 hover:text-white"><ZoomOutIcon className="w-5 h-5" /></button>
-                            <button onClick={handleImageResetZoom} className="p-2 text-slate-300 hover:text-white"><FitScreenIcon className="w-5 h-5" /></button>
-                            <button onClick={handleImageZoomIn} className="p-2 text-slate-300 hover:text-white"><ZoomInIcon className="w-5 h-5" /></button>
+                            <button onClick={handleImageZoomOut} title="縮小" className="p-2 text-slate-300 hover:text-white"><ZoomOutIcon className="w-5 h-5" /></button>
+                            <button onClick={handleImageResetZoom} title="画面に合わせる" className="p-2 text-slate-300 hover:text-white"><FitScreenIcon className="w-5 h-5" /></button>
+                            <button onClick={handleImageZoomIn} title="拡大" className="p-2 text-slate-300 hover:text-white"><ZoomInIcon className="w-5 h-5" /></button>
                             <div className="w-px h-6 bg-slate-600 mx-1"></div>
                           </>
                         )}
                         <div ref={copyMenuRef} className="dropdown">
                             <button onClick={() => setCopyMenuOpen(!isCopyMenuOpen)} className="flex items-center gap-2 py-2 px-3 rounded-md transition-colors text-slate-300 hover:text-white hover:bg-slate-700/50">
                                 {hasCopied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5" />}
-                                <span className="text-sm font-semibold">{hasCopied === 'text' ? 'Copied Text!' : hasCopied === 'html' ? 'Copied HTML!' : 'Copy...'}</span>
+                                <span className="text-sm font-semibold">{hasCopied === 'text' ? 'テキストをコピー！' : hasCopied === 'html' ? 'HTMLをコピー！' : 'コピー...'}</span>
                                 <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCopyMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
                             <div className="dropdown-content" data-open={isCopyMenuOpen}>
-                                <button onClick={() => handleCopyAscii('text')}>Plain Text (.txt)</button>
-                                <button onClick={() => handleCopyAscii('html')}>Colored HTML (for Word/Mail)</button>
+                                <button onClick={() => handleCopyAscii('text')}>テキスト形式 (.txt)</button>
+                                <button onClick={() => handleCopyAscii('html')}>カラーHTML (Word/メール用)</button>
                             </div>
                         </div>
                         <div className="w-px h-6 bg-slate-600 mx-1"></div>
                         <div ref={saveMenuRef} className="dropdown">
                             <button onClick={() => setSaveMenuOpen(!isSaveMenuOpen)} className="flex items-center gap-2 py-2 px-3 rounded-md transition-colors text-slate-300 hover:text-white hover:bg-slate-700/50">
                                 <DownloadIcon className="w-5 h-5" />
-                                <span className="text-sm font-semibold">Save...</span>
+                                <span className="text-sm font-semibold">保存...</span>
                                 <ChevronDownIcon className={`w-4 h-4 transition-transform ${isSaveMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
                             <div className="dropdown-content" data-open={isSaveMenuOpen}>
-                                <button onClick={handleSaveAsTxt}>Save as .txt</button>
-                                {imageAsciiDataUrl && (<a href={imageAsciiDataUrl} download="colored-ascii.jpg" className="block w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors">Save as Image (.jpg)</a>)}
+                                <button onClick={handleSaveAsTxt}>.txt を保存</button>
+                                {imageAsciiDataUrl && (<a href={imageAsciiDataUrl} download="colored-ascii.jpg" className="block w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors">画像 (.jpg) を保存</a>)}
                             </div>
                         </div>
                     </div>
                 </>
-            ) : (<div className="text-center text-slate-500"><AsciiArtIcon className="w-16 h-16 mx-auto mb-4" /><p>Upload an image to start</p></div>)}
+            ) : (<div className="text-center text-slate-500"><AsciiArtIcon className="w-16 h-16 mx-auto mb-4" /><p>画像をアップロードしてください</p></div>)}
         </div>
     </div>
   );
@@ -732,7 +755,7 @@ export default function App(): React.ReactNode {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 font-sans">
       <div className="w-full max-w-6xl mx-auto">
-        <header className="text-center mb-8"><h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">Creative Converter AI</h1></header>
+        <header className="text-center mb-8"><h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">Creative Converter AI</h1><p className="mt-2 text-slate-400 max-w-2xl mx-auto">動画や写真を魅力的なパラパラ漫画やアスキーアートに変換します。</p></header>
         <main className="bg-slate-800/50 rounded-2xl shadow-2xl p-6 backdrop-blur-sm border border-slate-700">
           {viewMode === 'idle' && <Dropzone onFileSelect={handleFileSelect} disabled={isProcessing} accept="video/*,image/*" />}
           {viewMode === 'flipbook' && renderFlipbookView()}

@@ -7,7 +7,7 @@ export async function generateTitleForImage(data: string, effect: string = 'none
 
     if (!apiKey) {
         console.warn("API_KEY environment variable not set. Skipping title generation.");
-        return "A Creative Flipbook";
+        return "クリエイティブな作品";
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -15,9 +15,9 @@ export async function generateTitleForImage(data: string, effect: string = 'none
     try {
         let response: GenerateContentResponse;
         if (effect === 'ascii') {
-            const systemInstruction = "You are a tech-savvy poet who creates short, evocative titles for ASCII art animations. Respond with only the title, nothing else. Do not use quotation marks.";
+            const systemInstruction = "あなたはアスキーアートアニメーションのための短くて印象的なタイトルを考える詩人です。タイトルのみを日本語で答えてください。引用符は使用しないでください。";
             // Send a snippet of the ASCII art to the AI
-            const textPart = { text: `What is a good title for this ASCII art animation? \n\n${data.substring(0, 800)}` };
+            const textPart = { text: `このアスキーアートアニメーションに良いタイトルをつけてください。 \n\n${data.substring(0, 800)}` };
             
             response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -33,17 +33,17 @@ export async function generateTitleForImage(data: string, effect: string = 'none
                 },
             };
             const textPart = {
-                text: `What is a good title for this image? It has a '${effect}' effect applied.`
+                text: `この画像に良いタイトルをつけてください。 '${effect}' というエフェクトが適用されています。`
             };
             
-            let systemInstruction = "You are a creative poet who creates short, elegant titles for images. The titles should be suitable for a flipbook. Respond with only the title, nothing else. Do not use quotation marks.";
+            let systemInstruction = "あなたは画像に対して短くてエレガントなタイトルをつける創造的な詩人です。タイトルはパラパラ漫画に適したものにしてください。タイトルのみを日本語で答えてください。引用符は使用しないでください。";
             
             if(effect === 'ukiyo-e') {
-                systemInstruction = "You are an expert in Japanese art. Create a short, poetic title for this image, which is in the style of Ukiyo-e. Respond with only the title, nothing else. Do not use quotation marks.";
+                systemInstruction = "あなたは日本美術の専門家です。この浮世絵風の画像に、短くて詩的なタイトルをつけてください。タイトルのみを日本語で答えてください。引用符は使用しないでください。";
             } else if (effect === 'genga' || effect === 'cel' || effect === 'pencil') {
-                systemInstruction = "You are a creative director for an animation studio. Create a short, evocative title for this animated sketch. Respond with only the title, nothing else. Do not use quotation marks.";
+                systemInstruction = "あなたはアニメーションスタジオのクリエイティブディレクターです。このラフスケッチ風のアニメーションに、短くて印象的なタイトルをつけてください。タイトルのみを日本語で答えてください。引用符は使用しないでください。";
             } else if (effect === '8bit') {
-                systemInstruction = "You are a classic video game designer. Create a short, retro-style title for this pixelated animation, like for an 8-bit game. Respond with only the title, nothing else. Do not use quotation marks.";
+                systemInstruction = "あなたはレトロゲームのデザイナーです。このピクセルアート風のアニメーションに、8ビットゲームのような短くてレトロなタイトルをつけてください。タイトルのみを日本語で答えてください。引用符は使用しないでください。";
             }
 
             response = await ai.models.generateContent({
@@ -58,6 +58,6 @@ export async function generateTitleForImage(data: string, effect: string = 'none
 
     } catch (error) {
         console.error("Error generating title with Gemini:", error);
-        return effect === 'ascii' ? "An ASCII Animation" : "A Moment in Motion";
+        return effect === 'ascii' ? "アスキーアートアニメーション" : "動きのある瞬間";
     }
 }

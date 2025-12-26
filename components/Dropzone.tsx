@@ -70,9 +70,9 @@ export const Dropzone: React.FC<DropzoneProps> = ({ onFileSelect, disabled, acce
       <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
         <UploadIcon className={`w-10 h-10 mb-3 text-slate-400 transition-transform duration-300 ${isDragging ? 'transform -translate-y-1' : ''}`} />
         <p className="mb-2 text-sm text-slate-400">
-          <span className="font-semibold text-cyan-400">Click to upload</span> or drag and drop
+          <span className="font-semibold text-cyan-400">クリックしてアップロード</span>、またはドラッグ＆ドロップ
         </p>
-        <p className="text-xs text-slate-500">Video or image files (MP4, JPG, PNG, etc.)</p>
+        <p className="text-xs text-slate-500">動画または画像ファイル (MP4, JPG, PNG など)</p>
       </div>
       <input
         ref={inputRef}

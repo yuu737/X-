@@ -451,6 +451,7 @@ export const convertImageToAscii = (
     const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
     const data = imageData.data;
     
+    // Background Masking Calculation
     let bgMask: boolean[] | null = null;
     if (transparentBgConfig) {
         const bgColor = [data[0], data[1], data[2]];
@@ -566,7 +567,9 @@ export const applyColoredAsciiEffect = (
     width: number, 
     height: number, 
     asciiWidth: number,
-    invert: boolean = false
+    invert: boolean = false,
+    outlineConfig?: OutlineConfig,
+    transparentBgConfig?: TransparentBgConfig
 ) => {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
@@ -579,14 +582,58 @@ export const applyColoredAsciiEffect = (
     const blockWidth = width / asciiWidth;
     const blockHeight = height / asciiHeight;
 
-    // We will draw onto the same canvas. First clear it.
-    // Fill with black to make colors pop
+    // Background mask pre-calculation
+    let bgMask: boolean[] | null = null;
+    if (transparentBgConfig) {
+        const bgColor = [data[0], data[1], data[2]];
+        bgMask = new Array(width * height).fill(false);
+        for (let i = 0; i < data.length; i += 4) {
+            const distance = Math.sqrt(
+                Math.pow(data[i] - bgColor[0], 2) + 
+                Math.pow(data[i + 1] - bgColor[1], 2) + 
+                Math.pow(data[i + 2] - bgColor[2], 2)
+            );
+            if (distance < transparentBgConfig.threshold) {
+                bgMask[i / 4] = true;
+            }
+        }
+    }
+
+    // Outline pre-calculation
+    let edgeMap: boolean[] | null = null;
+    if (outlineConfig) {
+        edgeMap = new Array(width * height).fill(false);
+        const gray = new Uint8ClampedArray(width * height);
+        for(let i=0; i<data.length; i+=4) gray[i/4] = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+
+        const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+        const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                if (bgMask && bgMask[y * width + x]) continue;
+
+                let gradX = 0, gradY = 0;
+                for (let j = -1; j <= 1; j++) {
+                    for (let i = -1; i <= 1; i++) {
+                        const val = gray[(y + j) * width + (x + i)];
+                        gradX += val * sobelX[j + 1][i + 1];
+                        gradY += val * sobelY[j + 1][i + 1];
+                    }
+                }
+                if (Math.sqrt(gradX * gradX + gradY * gradY) > outlineConfig.threshold) {
+                    edgeMap[y * width + x] = true;
+                }
+            }
+        }
+    }
+
+    // Draw background
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
     
-    // We need to calculate font size to fit blocks
-    // Note: This is an approximation. 
-    const fontSize = blockHeight; // Font size usually correlates to height
+    // Config font
+    const fontSize = blockHeight; 
     ctx.font = `${fontSize}px monospace`;
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
@@ -598,29 +645,64 @@ export const applyColoredAsciiEffect = (
             
             let r_sum = 0, g_sum = 0, b_sum = 0;
             let pixelCount = 0;
+            let bgPixelCount = 0;
+            let edgePixelCount = 0;
 
-            // Sample the block for average color
+            // Sample the block
             for (let blockY = 0; blockY < Math.ceil(blockHeight); blockY++) {
                 for (let blockX = 0; blockX < Math.ceil(blockWidth); blockX++) {
                     const pixelX = startX + blockX;
                     const pixelY = startY + blockY;
                     
                     if (pixelX < width && pixelY < height) {
-                        const i = (pixelY * width + pixelX) * 4;
+                        const idx = pixelY * width + pixelX;
+                        const i = idx * 4;
                         r_sum += data[i];
                         g_sum += data[i+1];
                         b_sum += data[i+2];
                         pixelCount++;
+
+                        if (bgMask && bgMask[idx]) bgPixelCount++;
+                        if (edgeMap && edgeMap[idx]) edgePixelCount++;
                     }
                 }
             }
 
             if (pixelCount === 0) continue;
 
+            // Transparency Check
+            if (bgMask && (bgPixelCount / pixelCount > 0.5)) {
+                continue; // Do not draw anything (transparent)
+            }
+
             const r = Math.round(r_sum / pixelCount);
             const g = Math.round(g_sum / pixelCount);
             const b = Math.round(b_sum / pixelCount);
-            const avgGray = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // If it's an edge block, use darker/dense char logic if Outline mode is on
+            // Or simply pick the character based on brightness, but maybe force black color or high contrast?
+            // convertImageToAscii forces the gray value to 0 (black).
+            // Here, we want to keep the color but pick a dense character.
+            
+            let avgGray = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            if (edgeMap && (edgePixelCount > 0)) {
+                // Determine edge character - simply map a dark value
+                // In inverted mode (dark background), edges are usually light, so high value.
+                // In normal mode (light background in convertImageToAscii logic), edges are black (0).
+                // Let's assume we want "dense" characters for edges.
+                // charSet is ordered light -> dark. 
+                // So index 0 is space, index last is @.
+                // To get dense char, we want high index.
+                // avgGray/255 -> 0..1. 
+                // We want to force a dense char.
+                avgGray = 0; // Black is dense? wait.
+                // In standard mapping: 0 (black) -> '@' (last index) if NOT inverted.
+                // The provided code: charIndex = (avgGray / 255) * (len - 1).
+                // ASCII_CHARS_FULL starts with space (light).
+                // So 255 (white) -> space. 0 (black) -> @.
+                // So yes, setting avgGray to 0 forces a dense character.
+            }
 
             const charIndex = Math.floor((avgGray / 255) * (charSet.length - 1));
             const char = charSet[charIndex] || ' ';
